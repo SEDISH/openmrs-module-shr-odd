@@ -171,6 +171,24 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		return retVal;
     }
 
+	protected Obs findLastProblemObs(Person patient, Concept concept){
+		List<Obs> candidates= Context.getObsService().getObservations(Arrays.asList(patient), null, null,
+				Arrays.asList(concept),null, null, null, null, null, null , null, false);
+		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
+		if(candidates.size() > 0)
+			return candidates.get(candidates.size() - 1);
+		return null;
+	}
+
+	protected Obs findFirstProblemObs(Patient patient, Concept concept){
+		List<Obs> candidates= Context.getObsService().getObservations(Arrays.asList(patient), null, null,
+				Arrays.asList(concept),null, null, null, null, null, null , null, false);
+		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
+		if(candidates.size()>0)
+			return candidates.get(0);
+		return null;
+	}
+
 	/**
 	 * Returns true if all the provided encounter parts have discrete components
 	 * That is, that the ObsGroups representing the 

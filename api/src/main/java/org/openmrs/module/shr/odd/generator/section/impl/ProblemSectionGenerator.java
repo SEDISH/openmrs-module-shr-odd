@@ -77,8 +77,8 @@ public class ProblemSectionGenerator extends SectionGeneratorImpl {
 				// Now add reference the status code
 				IVL<TS> eft = new IVL<TS>();
 
-				Obs startObs = findFirstProblemObs(condition);
-				Obs stopObs = findLastProblemObs(condition);
+				Obs startObs = findFirstProblemObs(condition.getPatient(), condition.getConcept());
+				Obs stopObs = findLastProblemObs(condition.getPatient(), condition.getConcept());
 
 				if(startObs != null){
 					eft.setLow(this.m_cdaDataUtil.createTS(condition.getOnsetDate()));
@@ -144,32 +144,6 @@ public class ProblemSectionGenerator extends SectionGeneratorImpl {
 		}
 
 		return retVal;
-	}
-
-	private Obs findLastProblemObs(Condition condition){
-		List<Obs> candidates= new ArrayList<>();
-		List<Obs> obs = Context.getObsService().getObservationsByPerson(condition.getPatient());
-		for(Obs currentObs : obs){
-			if(currentObs.getValueCoded() != null && currentObs.getValueCoded().equals(condition.getConcept()))
-				candidates.add(currentObs);
-		}
-		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
-		if(candidates.size()>0)
-			return candidates.get(candidates.size()-1);
-		return null;
-	}
-
-	private Obs findFirstProblemObs(Condition condition){
-		List<Obs> candidates= new ArrayList<>();
-		List<Obs> obs = Context.getObsService().getObservationsByPerson(condition.getPatient());
-		for(Obs currentObs : obs){
-			if(currentObs.getValueCoded() != null && currentObs.getValueCoded().equals(condition.getConcept()))
-				candidates.add(currentObs);
-		}
-		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
-		if(candidates.size()>0)
-			return candidates.get(0);
-		return null;
 	}
 
 	/**

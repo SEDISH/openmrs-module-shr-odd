@@ -90,7 +90,7 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 				requiredAllergyAssertions.remove(allergy.getAllergen());
 
 				// Add an entry relationship of the problem
-				Obs problemObs = findLastProblemObs(allergy);
+				Obs problemObs = findLastProblemObs(allergy.getPatient(), allergy.getAllergen().getCodedAllergen());
 				
 				Observation problemObservation = super.createObs(Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_CCD_ALERT_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_ALLERGY_AND_INTOLERANCE_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_OBSERVATION),
 					problemObs,
@@ -251,32 +251,6 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 			retVal.setText(super.generateLevel3Text(retVal));
 
 		return retVal;
-	}
-
-	private Obs findLastProblemObs(Allergy allergy){
-		List<Obs> candidates= new ArrayList<>();
-		List<Obs> obs = Context.getObsService().getObservationsByPerson(allergy.getPatient());
-		for(Obs currentObs : obs){
-			if(currentObs.getValueCoded() != null && currentObs.getValueCoded().equals(allergy.getAllergen().getCodedAllergen()))
-				candidates.add(currentObs);
-		}
-		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
-		if(candidates.size()>0)
-			return candidates.get(candidates.size()-1);
-		return null;
-	}
-
-	private Obs findFirstProblemObs(Allergy allergy){
-		List<Obs> candidates= new ArrayList<>();
-		List<Obs> obs = Context.getObsService().getObservationsByPerson(allergy.getPatient());
-		for(Obs currentObs : obs){
-			if(currentObs.getValueCoded() != null && currentObs.getValueCoded().equals(allergy.getAllergen().getCodedAllergen()))
-				candidates.add(currentObs);
-		}
-		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
-		if(candidates.size()>0)
-			return candidates.get(0);
-		return null;
 	}
 
 	/**
