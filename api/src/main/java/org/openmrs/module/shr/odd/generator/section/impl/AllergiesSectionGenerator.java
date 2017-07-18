@@ -1,7 +1,5 @@
 package org.openmrs.module.shr.odd.generator.section.impl;
 
-import java.util.*;
-
 import org.marc.everest.datatypes.BL;
 import org.marc.everest.datatypes.ED;
 import org.marc.everest.datatypes.ENXP;
@@ -32,12 +30,18 @@ import org.marc.everest.rmim.uv.cdar2.vocabulary.x_ActMoodDocumentObservation;
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_ActRelationshipEntry;
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_ActRelationshipEntryRelationship;
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_DocumentActMood;
-import org.openmrs.*;
+import org.openmrs.Allergy;
+import org.openmrs.Concept;
+import org.openmrs.Obs;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.shr.cdahandler.CdaHandlerConstants;
 import org.openmrs.module.shr.cdahandler.api.CdaImportService;
 import org.openmrs.module.shr.cdahandler.exception.DocumentImportException;
 import org.openmrs.module.shr.cdahandler.obs.ExtendedObs;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * A generator for the allergies or alerts section
@@ -63,7 +67,7 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 
 		// Create generic section construct
 		Section retVal = super.createSection(
-			Arrays.asList(CdaHandlerConstants.SCT_TEMPLATE_CCD_ALERTS, CdaHandlerConstants.SCT_TEMPLATE_ALLERGIES), 
+			Arrays.asList(CdaHandlerConstants.SCT_TEMPLATE_CCD_ALERTS, CdaHandlerConstants.SCT_TEMPLATE_ALLERGIES),
 			"section.allergy.title",
 			this.m_sectionCode
 		);
@@ -74,13 +78,9 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 		);
 		
 		// Problem section must have level 3 content
-		if(allergies.size() > 0)
-		{
-
-			
+		if (allergies.size() > 0) {
 			// Generate problem list
-			for(Allergy allergy : allergies)
-			{
+			for (Allergy allergy : allergies) {
 				Act problemAct = super.createAct(
 					x_ActClassDocumentEntryAct.Act,
 					x_DocumentActMood.Eventoccurrence,
@@ -100,8 +100,7 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 				
 				// Now for allergy information
 				String typeMnemonic = "", display = "";
-				switch(allergy.getAllergenType())
-				{
+				switch (allergy.getAllergenType()) {
 					case DRUG:
 						typeMnemonic = "D";
 						display = "Drug ";
@@ -120,13 +119,10 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 				}
 
 				// Complete the code and assign
-				if(typeMnemonic.equals("O"))
-				{
+				if (typeMnemonic.equals("O")) {
 					typeMnemonic = "ALG";
 					display += "Allergy";
-				}
-				else
-				{
+				} else {
 					typeMnemonic += "ALG";
 					display += "Allergy";
 				}
@@ -148,16 +144,16 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 				Concept severityConcept = allergy.getSeverity();
 				String uuidSeverity = severityConcept.getUuid();
 				String severityCode = null;
-				if(uuidSeverity.equals(getGlobalProperty("allergy.concept.severity.mild")))
+				if (uuidSeverity.equals(getGlobalProperty("allergy.concept.severity.mild"))) {
 					severityCode = "L";
-				else if(uuidSeverity.equals(getGlobalProperty("allergy.concept.severity.moderate")))
+				} else if (uuidSeverity.equals(getGlobalProperty("allergy.concept.severity.moderate"))) {
 					severityCode = "M";
-				else if(uuidSeverity.equals(getGlobalProperty("allergy.concept.severity.severe")))
+				} else if (uuidSeverity.equals(getGlobalProperty("allergy.concept.severity.severe"))) {
 					severityCode = "H";
+				}
 
 				// Severity code
-				if(severityCode != null)
-				{
+				if (severityCode != null) {
 					Observation severityObservation = new Observation(x_ActMoodDocumentObservation.Eventoccurrence);
 					
 					severityObservation.setId(SET.createSET(new II(UUID.randomUUID())));
@@ -171,22 +167,23 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 				
 				// Now the manifestations (these are sub-observations)
 				try {
-	                for(Obs manifestationObs : this.m_service.getObsGroupMembers(problemObs, Arrays.asList(super.m_conceptUtil.getOrCreateConcept(new CV<String>("PROBLEM", CdaHandlerConstants.CODE_SYSTEM_IHE_ACT_CODE)))))
-	                {
+	                for (Obs manifestationObs : this.m_service.getObsGroupMembers(problemObs, Arrays.asList(super.m_conceptUtil.getOrCreateConcept(new CV<String>("PROBLEM", CdaHandlerConstants.CODE_SYSTEM_IHE_ACT_CODE))))) {
 	                	ExtendedObs eobs = Context.getService(CdaImportService.class).getExtendedObs(manifestationObs.getId());
-	                	if(eobs == null) continue;
+	                	if (eobs == null) {
+							continue;
+						}
 	                	
 	                	EntryRelationship manifestation = new EntryRelationship(x_ActRelationshipEntryRelationship.MFST, BL.TRUE);
 	                	manifestation.setTemplateId(LIST.createLIST(new II(CdaHandlerConstants.ENT_TEMPLATE_MANIFESTATION_RELATION)));
 	                	Observation manifestationObservation = super.createObs(Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_CCD_REACTION_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_OBSERVATION), eobs, CdaHandlerConstants.CODE_SYSTEM_IHE_ACT_CODE);
-	                	if(manifestationObservation.getValue() instanceof CE)
-	                		super.correctCode((CE)manifestationObservation.getValue(), CdaHandlerConstants.CODE_SYSTEM_ICD_10, CdaHandlerConstants.CODE_SYSTEM_SNOMED);
+	                	if (manifestationObservation.getValue() instanceof CE) {
+							super.correctCode((CE) manifestationObservation.getValue(), CdaHandlerConstants.CODE_SYSTEM_ICD_10, CdaHandlerConstants.CODE_SYSTEM_SNOMED);
+						}
 
 	                	manifestation.setClinicalStatement(manifestationObservation);
 	                	problemObservation.getEntryRelationship().add(manifestation);
 	                }
-                }
-                catch (DocumentImportException e) {
+                } catch (DocumentImportException e) {
 	                // TODO Auto-generated catch block
 	                log.error("Error generated", e);
                 }
@@ -194,15 +191,10 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 				retVal.getEntry().add(new Entry(x_ActRelationshipEntry.HasComponent, BL.TRUE, problemAct));
 				
 			}
-			
-		}
-		else if(this.getSectionObs().size() > 0) // unstructured?
-		{
+		} else if (this.getSectionObs().size() > 0) { // unstructured?
 			requiredAllergyAssertions.clear();
 			super.generateLevel2Content(retVal);
-		}
-		else
-		{
+		} else {
 			
 			Act problemAct = super.createNoKnownProblemAct(
 				Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_ALLERGIES_AND_INTOLERANCES_CONCERN, CdaHandlerConstants.ENT_TEMPLATE_CONCERN_ENTRY, CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_ACT),
@@ -210,12 +202,10 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 				new CD<String>("160244002", CdaHandlerConstants.CODE_SYSTEM_SNOMED, null, null, "No known allergies", null));
 			retVal.getEntry().add(new Entry(x_ActRelationshipEntry.HasComponent, BL.TRUE, problemAct));
 			super.generateLevel3Text(retVal);
-
 		}
 		
 		// Now we add the mandatory assertions
-		for(Concept allergen : requiredAllergyAssertions)
-		{
+		for (Concept allergen : requiredAllergyAssertions) {
 			Act allergenAct = new Act(x_ActClassDocumentEntryAct.Act, x_DocumentActMood.Eventoccurrence);
 			allergenAct.setTemplateId(super.getTemplateIdList(Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_ALLERGIES_AND_INTOLERANCES_CONCERN, CdaHandlerConstants.ENT_TEMPLATE_CONCERN_ENTRY, CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_ACT)));
 			allergenAct.setId(SET.createSET(new II(UUID.randomUUID())));
@@ -243,13 +233,12 @@ public class AllergiesSectionGenerator extends SectionGeneratorImpl {
 			allergenAct.getEntryRelationship().add(new EntryRelationship(x_ActRelationshipEntryRelationship.SUBJ, BL.TRUE, allergenObs));
 			allergenAct.getEntryRelationship().get(0).setInversionInd(BL.FALSE);
 			retVal.getEntry().add(new Entry(x_ActRelationshipEntry.DRIV, BL.TRUE, allergenAct));
-			
 		}
 		
 		// Generate level 3
-		if(retVal.getEntry().size() > 0)
+		if (retVal.getEntry().size() > 0) {
 			retVal.setText(super.generateLevel3Text(retVal));
-
+		}
 		return retVal;
 	}
 

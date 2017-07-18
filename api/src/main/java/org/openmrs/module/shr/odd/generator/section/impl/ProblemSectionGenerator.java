@@ -1,7 +1,5 @@
 package org.openmrs.module.shr.odd.generator.section.impl;
 
-import java.util.*;
-
 import org.marc.everest.datatypes.BL;
 import org.marc.everest.datatypes.NullFlavor;
 import org.marc.everest.datatypes.TS;
@@ -27,6 +25,9 @@ import org.openmrs.module.shr.cdahandler.CdaHandlerConstants;
 import org.openmrs.module.shr.cdahandler.api.CdaImportService;
 import org.openmrs.module.shr.cdahandler.exception.DocumentImportException;
 import org.openmrs.module.shr.cdahandler.obs.ExtendedObs;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Generator for Problem section
@@ -57,17 +58,15 @@ public class ProblemSectionGenerator extends SectionGeneratorImpl {
 
 		// Create generic section construct
 		Section retVal = super.createSection(
-			Arrays.asList(CdaHandlerConstants.SCT_TEMPLATE_CCD_PROBLEM, CdaHandlerConstants.SCT_TEMPLATE_ACTIVE_PROBLEMS), 
+			Arrays.asList(CdaHandlerConstants.SCT_TEMPLATE_CCD_PROBLEM, CdaHandlerConstants.SCT_TEMPLATE_ACTIVE_PROBLEMS),
 			"section.problem.title",
 			this.m_sectionCode
 		);
 
 		// Problem section must have level 3 content
-		if(conditions.size() > 0)
-		{
+		if (conditions.size() > 0) {
 			// Generate problem list
-			for(Condition condition : conditions)
-			{
+			for (Condition condition : conditions) {
 				Act problemAct = super.createAct(
 					x_ActClassDocumentEntryAct.Act,
 					x_DocumentActMood.Eventoccurrence,
@@ -75,44 +74,51 @@ public class ProblemSectionGenerator extends SectionGeneratorImpl {
 					condition);
 
 				// Now add reference the status code
-				IVL<TS> eft = new IVL<TS>();
+				IVL<TS> eft = new IVL<>();
 
 				Obs startObs = findFirstProblemObs(condition.getPatient(), condition.getConcept());
 				Obs stopObs = findLastProblemObs(condition.getPatient(), condition.getConcept());
 
-				if(startObs != null){
+				if (startObs != null) {
 					eft.setLow(this.m_cdaDataUtil.createTS(condition.getOnsetDate()));
 					//Correct the precision of the dates
 					ExtendedObs obs = Context.getService(CdaImportService.class).getExtendedObs(startObs.getId());
-					if(obs != null && obs.getObsDatePrecision() == 0)
+					if ((obs != null) && obs.getObsDatePrecision() == 0) {
 						eft.getLow().setNullFlavor(NullFlavor.Unknown);
-					else if(obs != null)
+					} else if (obs != null) {
 						eft.getLow().setDateValuePrecision(obs.getObsDatePrecision());
+					}
 				}
-				if(stopObs != null){
+				if (stopObs != null) {
 					eft.setHigh(this.m_cdaDataUtil.createTS(condition.getEndDate()));
 					// Correct the precision of the dates
 					ExtendedObs obs = Context.getService(CdaImportService.class).getExtendedObs(stopObs.getId());
-					if(obs != null && obs.getObsDatePrecision() == 0)
+					if ((obs != null) && (obs.getObsDatePrecision() == 0)) {
 						eft.getHigh().setNullFlavor(NullFlavor.Unknown);
-					else if(obs != null)
+					} else if (obs != null) {
 						eft.getHigh().setDateValuePrecision(obs.getObsDatePrecision());
+					}
 				}
 				problemAct.setEffectiveTime(eft);
 
 
 
 				// Negation indicator?
-				if(condition.getStatus() != null)
-					switch(condition.getStatus())
-					{
+				if (condition.getStatus() != null) {
+					switch (condition.getStatus()) {
 						case HISTORY_OF:
 							problemAct.setStatusCode(ActStatus.Completed);
+							break;
 						case INACTIVE:
 							problemAct.setNegationInd(BL.TRUE);
+							break;
+						case ACTIVE:
+							problemAct.setStatusCode(ActStatus.Active);
+							break;
 					}
-				else
+				} else {
 					problemAct.setStatusCode(ActStatus.Active);
+				}
 
 				// Add an entry relationship of the problem
 				
@@ -127,14 +133,9 @@ public class ProblemSectionGenerator extends SectionGeneratorImpl {
 
 			retVal.setText(super.generateLevel3Text(retVal));
 			
-		}
-		else if(this.getSectionObs().size() > 0) // unstructured?
-		{
+		} else if (this.getSectionObs().size() > 0) { // unstructured?
 			super.generateLevel2Content(retVal);
-		}
-		else
-		{
-			
+		} else {
 			Act problemAct = super.createNoKnownProblemAct(
 				Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_CONCERN, CdaHandlerConstants.ENT_TEMPLATE_CONCERN_ENTRY, CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_ACT),
 				new CD<String>("55607006", CdaHandlerConstants.CODE_SYSTEM_SNOMED, null, null, "Problem", null),

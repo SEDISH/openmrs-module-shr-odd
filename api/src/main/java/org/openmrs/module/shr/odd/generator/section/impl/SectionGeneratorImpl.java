@@ -80,7 +80,19 @@ import org.marc.everest.rmim.uv.cdar2.vocabulary.x_ActRelationshipExternalRefere
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_DocumentActMood;
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_DocumentProcedureMood;
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_DocumentSubstanceMood;
-import org.openmrs.*;
+import org.openmrs.BaseOpenmrsData;
+import org.openmrs.Concept;
+import org.openmrs.Condition;
+import org.openmrs.Drug;
+import org.openmrs.DrugOrder;
+import org.openmrs.Encounter;
+import org.openmrs.Obs;
+import org.openmrs.Order;
+import org.openmrs.Patient;
+import org.openmrs.Person;
+import org.openmrs.Provider;
+import org.openmrs.VisitAttribute;
+import org.openmrs.VisitAttributeType;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.shr.cdahandler.CdaHandlerConstants;
 import org.openmrs.module.shr.cdahandler.api.CdaImportService;
@@ -165,27 +177,30 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		retVal.setId(new II(UUID.randomUUID()));
 		// Set templates
 		LIST<II> sectionTemplate = new LIST<II>();
-		for(String template : templateIds)
+		for (String template : templateIds) {
 			sectionTemplate.add(new II(template));
+		}
 		retVal.setTemplateId(sectionTemplate);
 		return retVal;
     }
 
-	protected Obs findLastProblemObs(Person patient, Concept concept){
+	protected Obs findLastProblemObs(Person patient, Concept concept) {
 		List<Obs> candidates= Context.getObsService().getObservations(Arrays.asList(patient), null, null,
 				Arrays.asList(concept),null, null, null, null, null, null , null, false);
 		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
-		if(candidates.size() > 0)
+		if (candidates.size() > 0) {
 			return candidates.get(candidates.size() - 1);
+		}
 		return null;
 	}
 
-	protected Obs findFirstProblemObs(Patient patient, Concept concept){
+	protected Obs findFirstProblemObs(Patient patient, Concept concept) {
 		List<Obs> candidates= Context.getObsService().getObservations(Arrays.asList(patient), null, null,
 				Arrays.asList(concept),null, null, null, null, null, null , null, false);
 		Collections.sort(candidates, Comparator.comparing(Obs::getObsDatetime));
-		if(candidates.size()>0)
+		if (candidates.size() > 0) {
 			return candidates.get(0);
+		}
 		return null;
 	}
 
@@ -199,8 +214,7 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		List<Obs> sectionObservations = this.getSectionObs();
 		// Loop through found observations and scan for contained obs or orders
 		boolean hasComponentObservations = sectionObservations.size() > 0;
-		for(Obs obsGroup : sectionObservations)
-		{
+		for (Obs obsGroup : sectionObservations) {
 			List<Obs> groupMembers = this.m_service.getObsGroupMembers(obsGroup);
 			// If the obs group has no group members, we need to look at orders which are a little more complex
 			hasComponentObservations &= groupMembers != null && groupMembers.size() > 0;
@@ -217,8 +231,7 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		// Get all obs matching the specified section concept(s)
 		List<Encounter> docEncounters = this.getDocEncounters();
 		boolean hasComponents = docEncounters.size() > 0;
-		for(Encounter e : docEncounters)
-		{
+		for (Encounter e : docEncounters) {
 			// To appease the search function
 			List<Person> recordTarget = new ArrayList<Person>();
 			recordTarget.add(this.m_registration.getPatient());
@@ -284,9 +297,11 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	 */
 	protected List<Encounter> getDocEncounters() {
 		List<Encounter> docEncounters = new ArrayList<Encounter>();
-		for(OnDemandDocumentEncounterLink encounterLink : this.m_registration.getEncounterLinks())
-			if(!encounterLink.getVoided() && !encounterLink.getEncounter().getVoided())
+		for (OnDemandDocumentEncounterLink encounterLink : this.m_registration.getEncounterLinks()) {
+			if (!encounterLink.getVoided() && !encounterLink.getEncounter().getVoided()) {
 				docEncounters.add(encounterLink.getEncounter());
+			}
+		}
 		return docEncounters;
     }
 
@@ -302,18 +317,17 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		
 		// List node
 		StructDocElementNode listNode = text.createElement("list", DatatypeFormatter.NS_HL7);
-		for(Obs obs : sectionObs)
-		{
-			if(obs.getVoided())
+		for (Obs obs : sectionObs) {
+			if (obs.getVoided()) {
 				continue; // skip voided
+			}
 			StructDocElementNode listItem = listNode.addElement("item");
 			listItem.addElement("caption", String.format("From %s on %s (created by %s))", obs.getEncounter().getEncounterType().getName(), obs.getObsDatetime(), obs.getCreator().getPersonName()));
 			
 			StructDocNode childNode = this.m_cdaDataUtil.createText(obs);
-			if(!(childNode instanceof StructDocElementNode))
+			if (!(childNode instanceof StructDocElementNode)) {
 				childNode = listItem.addElement("content", childNode);
-			else
-			{
+			} else {
 				// Scrub the child node's ID because this is level 2 content and no entries reference
 				childNode = this.m_cdaDataUtil.scrubIDs(childNode);
 	
@@ -361,9 +375,10 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		retVal.setTemplateId(this.getTemplateIdList(templateId));
 		
 		// Other attributes
-		if(id != null)
+		if (id != null) {
 			retVal.setId(SET.createSET(id));
-		
+		}
+
 		// code and effective time
 		retVal.setCode(code);
 		retVal.setEffectiveTime(this.m_cdaDataUtil.createTS(effectiveTime));
@@ -394,8 +409,9 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    // Is there a creation time?
     	retVal.getAuthor().add(this.createAuthorPointer(activeListItem));
 
-    	if(activeListItem instanceof Condition)
-	    	retVal.setStatusCode(ConcernEntryProcessor.calculateCurrentStatus((Condition)activeListItem));;
+    	if (activeListItem instanceof Condition) {
+			retVal.setStatusCode(ConcernEntryProcessor.calculateCurrentStatus((Condition) activeListItem));
+		}
 	    
 		return retVal;
     }
@@ -410,7 +426,9 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    retVal.setTemplateId(this.getTemplateIdList(templateId));
 	    
 		Reference original = this.createReferenceToDocument(sourceObs);
-		if(original != null) retVal.getReference().add(original);
+		if (original != null) {
+			retVal.getReference().add(original);
+		}
 
 	    // Add identifier
 		retVal.setId(this.getIdentifierList(sourceObs));
@@ -424,15 +442,14 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    // Value .. the tricky part
 	    retVal.setValue(this.m_cdaDataUtil.getObservationValue(sourceObs));
 	    
-	    if(sourceObs.getComment() != null)
-	        try {
-	            retVal.setText(sourceObs.getComment());
-            }
-            catch (UnsupportedEncodingException e) {
-	            // TODO Auto-generated catch block
-	            log.error("Error generated", e);
-            }
-
+	    if (sourceObs.getComment() != null) {
+			try {
+				retVal.setText(sourceObs.getComment());
+			} catch (UnsupportedEncodingException e) {
+				// TODO Auto-generated catch block
+				log.error("Error generated", e);
+			}
+		}
 	    
 	    // Set the status, mood, and effective time
     	retVal.setStatusCode(this.getStatusCode(sourceObs));
@@ -441,40 +458,41 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 
 	    // Extended observation stuff
 	    ExtendedObs extendedObs = Context.getService(CdaImportService.class).getExtendedObs(sourceObs.getId());
-	    if(extendedObs != null)
-	    	this.setExtendedObservationProperties(retVal, extendedObs);
+	    if (extendedObs != null) {
+			this.setExtendedObservationProperties(retVal, extendedObs);
+		}
 	    
 	    // Look for negation
 	    List<Obs> negation = this.m_service.getObsGroupMembers(sourceObs, Arrays.asList(Context.getConceptService().getConcept(CdaHandlerConstants.CONCEPT_ID_SIGN_SYMPTOM_PRESENT)));
-	    if(negation.size() > 0 && negation.get(0).getValueCoded().getId().toString().equals(Context.getAdministrationService().getGlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_FALSE_CONCEPT)))
-	    	retVal.setNegationInd(BL.TRUE);
+	    if (negation.size() > 0 && negation.get(0).getValueCoded().getId().toString().equals(Context.getAdministrationService().getGlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_FALSE_CONCEPT))) {
+			retVal.setNegationInd(BL.TRUE);
+		}
 	    	
 	    try {
 	        List<Obs> references = this.m_service.getObsGroupMembers(sourceObs, Arrays.asList(this.m_conceptUtil.getOrCreateRMIMConcept(CdaHandlerConstants.RMIM_CONCEPT_UUID_REFERENCE, new ST())));
-	        if(references.size() > 0)
-	        	for(Obs ref : references)
-	        	{
-	        		Reference refr = new Reference();
-	        		ExternalDocument ed = new ExternalDocument();
-	        		ed.setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(ref.getValueText())));
-	        		refr.setTypeCode(x_ActRelationshipExternalReference.REFR);
-	        		refr.setExternalActChoice(ed);
-	        		retVal.getReference().add(refr);
-	        	}
-        }
-        catch (DocumentImportException e) {
+	        if (references.size() > 0) {
+				for (Obs ref : references) {
+					Reference refr = new Reference();
+					ExternalDocument ed = new ExternalDocument();
+					ed.setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(ref.getValueText())));
+					refr.setTypeCode(x_ActRelationshipExternalReference.REFR);
+					refr.setExternalActChoice(ed);
+					retVal.getReference().add(refr);
+				}
+			}
+        } catch (DocumentImportException e) {
 	        // TODO Auto-generated catch block
 	        log.error("Error generated", e);
         }
 	    
 	    // Replacement?
-	    if(sourceObs.getPreviousVersion() != null)
-	    {
+	    if (sourceObs.getPreviousVersion() != null) {
 	    	Reference prevRef = new Reference(x_ActRelationshipExternalReference.RPLC);
 	    	ExternalAct externalAct = new ExternalAct(new CD<String>("OBS"));
 	    	externalAct.setId(SET.createSET(new II(this.m_cdaConfiguration.getObsRoot(), sourceObs.getPreviousVersion().getId().toString())));
-	    	if(sourceObs.getPreviousVersion().getAccessionNumber() != null)
-	    		externalAct.getId().add(this.m_cdaDataUtil.parseIIFromString(sourceObs.getPreviousVersion().getAccessionNumber()));
+	    	if (sourceObs.getPreviousVersion().getAccessionNumber() != null) {
+				externalAct.getId().add(this.m_cdaDataUtil.parseIIFromString(sourceObs.getPreviousVersion().getAccessionNumber()));
+			}
 	    	prevRef.setExternalActChoice(externalAct);
 	    	retVal.getReference().add(prevRef);
 	    }
@@ -488,11 +506,11 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	 */
 	protected SET<II> getIdentifierList(Obs sourceObs) {
 		SET<II> retVal = new SET<II>();
-	    if(sourceObs.getAccessionNumber() != null && !sourceObs.getAccessionNumber().isEmpty())
-	    {
+	    if (sourceObs.getAccessionNumber() != null && !sourceObs.getAccessionNumber().isEmpty()) {
 	    	II ii = this.m_cdaDataUtil.parseIIFromString(sourceObs.getAccessionNumber());
-	    	if(ii.getRoot() != null && !ii.getRoot().isEmpty())
-	    		retVal.add(ii);
+	    	if (ii.getRoot() != null && !ii.getRoot().isEmpty()) {
+				retVal.add(ii);
+			}
 	    }
 	    retVal.add(new II(this.m_cdaConfiguration.getObsRoot(), sourceObs.getId().toString()));
 	    return retVal;
@@ -503,10 +521,12 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	 */
 	protected void setExtendedObservationProperties(Observation cdaObservation, ExtendedObs extendedObs) {
 
-    	if(extendedObs.getObsInterpretation() != null)
-    		cdaObservation.setInterpretationCode(SET.createSET((CE<ObservationInterpretation>)this.m_oddMetadataUtil.getStandardizedCode(extendedObs.getObsInterpretation(), ObservationInterpretation.Abnormal.getCodeSystem(), CE.class)));
-    	if(extendedObs.getObsRepeatNumber() != null)
-    		cdaObservation.setRepeatNumber(new INT(extendedObs.getObsRepeatNumber()));
+    	if (extendedObs.getObsInterpretation() != null) {
+			cdaObservation.setInterpretationCode(SET.createSET((CE<ObservationInterpretation>) this.m_oddMetadataUtil.getStandardizedCode(extendedObs.getObsInterpretation(), ObservationInterpretation.Abnormal.getCodeSystem(), CE.class)));
+		}
+    	if (extendedObs.getObsRepeatNumber() != null) {
+			cdaObservation.setRepeatNumber(new INT(extendedObs.getObsRepeatNumber()));
+		}
     	
     }
 
@@ -514,58 +534,60 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	 * Get the mood code
 	 */
 	protected <T extends IEnumeratedVocabulary> CS<T> getMoodCode(Obs obs, Class<T> vocabulary) {
-		 if(obs instanceof ExtendedObs)
-		    {
-		    	ExtendedObs extendedObs = (ExtendedObs)obs;
-		    	CS<String> status = this.m_oddMetadataUtil.getStandardizedCode(extendedObs.getObsMood(), x_DocumentProcedureMood.Eventoccurrence.getCodeSystem(), CS.class);
-		    	if(status.isNull())
-		    		return new CS<T>(FormatterUtil.fromWireFormat("EVN", vocabulary));
-		    	else
-		    		return new CS<T>(FormatterUtil.fromWireFormat(status.getCode(), vocabulary));
-		    }
-			 else
-			 {
-				 return new CS<T>(FormatterUtil.fromWireFormat("EVN", vocabulary));
-			 }
+		if (obs instanceof ExtendedObs) {
+			ExtendedObs extendedObs = (ExtendedObs)obs;
+			CS<String> status = this.m_oddMetadataUtil.getStandardizedCode(extendedObs.getObsMood(), x_DocumentProcedureMood.Eventoccurrence.getCodeSystem(), CS.class);
+			if (status.isNull()) {
+				return new CS<T>(FormatterUtil.fromWireFormat("EVN", vocabulary));
+			} else {
+				return new CS<T>(FormatterUtil.fromWireFormat(status.getCode(), vocabulary));
+			}
+		} else {
+			return new CS<T>(FormatterUtil.fromWireFormat("EVN", vocabulary));
+		}
     }
 
 	/**
 	 * Get the effective time
 	 */
 	protected IVL<TS> getEffectiveTime(Obs obs) {
-		IVL<TS> retVal = new IVL<TS>();
+		IVL<TS> retVal = new IVL<>();
 		
-		if(obs instanceof ExtendedObs)
-		{
+		if (obs instanceof ExtendedObs) {
 			ExtendedObs extendedObs = (ExtendedObs)obs;
 	    	// status?
-	    	if(extendedObs.getObsDatetime() != null &&
+	    	if (extendedObs.getObsDatetime() != null &&
 	    			extendedObs.getObsStartDate() == null &&
-	    			extendedObs.getObsEndDate() == null)
-	    		retVal.setValue(this.m_cdaDataUtil.createTS(extendedObs.getObsDatetime()));
-	    	else
-	    	{
+	    			extendedObs.getObsEndDate() == null) {
+				retVal.setValue(this.m_cdaDataUtil.createTS(extendedObs.getObsDatetime()));
+			} else {
 	    		retVal.setValue(null);
-		    	if(extendedObs.getObsStartDate() != null)
-		    		retVal.setLow(this.m_cdaDataUtil.createTS(extendedObs.getObsStartDate()));
-		    	if(extendedObs.getObsEndDate() != null)
-		    		retVal.setHigh(this.m_cdaDataUtil.createTS(extendedObs.getObsEndDate()));
+		    	if (extendedObs.getObsStartDate() != null) {
+					retVal.setLow(this.m_cdaDataUtil.createTS(extendedObs.getObsStartDate()));
+				}
+		    	if (extendedObs.getObsEndDate() != null) {
+					retVal.setHigh(this.m_cdaDataUtil.createTS(extendedObs.getObsEndDate()));
+				}
 			}
 	    	
 	    	// Null ?
-	    	if(extendedObs.getObsDatePrecision() == 0)
-	    		retVal.setNullFlavor(NullFlavor.Unknown);
+	    	if (extendedObs.getObsDatePrecision() == 0) {
+				retVal.setNullFlavor(NullFlavor.Unknown);
+			}
 	    	
 	    	// Set precision
-	    	if(retVal.getValue() != null)
-	    		retVal.getValue().setDateValuePrecision(extendedObs.getObsDatePrecision());
-	    	if(retVal.getLow() != null)
-	    		retVal.getLow().setDateValuePrecision(extendedObs.getObsDatePrecision());
-	    	if(retVal.getHigh() != null)
-	    		retVal.getHigh().setDateValuePrecision(extendedObs.getObsDatePrecision());
-		}
-		else
+	    	if (retVal.getValue() != null) {
+				retVal.getValue().setDateValuePrecision(extendedObs.getObsDatePrecision());
+			}
+	    	if (retVal.getLow() != null) {
+				retVal.getLow().setDateValuePrecision(extendedObs.getObsDatePrecision());
+			}
+	    	if (retVal.getHigh() != null) {
+				retVal.getHigh().setDateValuePrecision(extendedObs.getObsDatePrecision());
+			}
+		} else {
 			retVal.setValue(this.m_cdaDataUtil.createTS(obs.getObsDatetime()));
+		}
 		
 		return retVal;
     }
@@ -574,14 +596,13 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	 * Get the status code of the object
 	 */
 	protected CS<ActStatus> getStatusCode(Obs obs) {
-		 if(obs instanceof ExtendedObs)
-	    {
-	    	ExtendedObs extendedObs = (ExtendedObs)obs;
-	    	CS<String> status = this.m_oddMetadataUtil.getStandardizedCode(extendedObs.getObsStatus(), ActStatus.Aborted.getCodeSystem(), CS.class);
-	    	return new CS<ActStatus>(new ActStatus(status.getCode(), ActStatus.Completed.getCodeSystem()));
-	    }
-		 else
-			 return new CS<ActStatus>(ActStatus.Completed);
+		if (obs instanceof ExtendedObs) {
+			ExtendedObs extendedObs = (ExtendedObs)obs;
+			CS<String> status = this.m_oddMetadataUtil.getStandardizedCode(extendedObs.getObsStatus(), ActStatus.Aborted.getCodeSystem(), CS.class);
+			return new CS<ActStatus>(new ActStatus(status.getCode(), ActStatus.Completed.getCodeSystem()));
+		} else {
+			return new CS<ActStatus>(ActStatus.Completed);
+		}
     }
 
 	/**
@@ -589,20 +610,16 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	 */
 	protected Author createAuthorPointer(BaseOpenmrsData sourceData) {
 		Author retVal = new Author(ContextControl.OverridingPropagating);
-		if(sourceData.getChangedBy() != null)
-		{
+		if (sourceData.getChangedBy() != null) {
 			retVal.setTime(this.m_cdaDataUtil.createTS(sourceData.getDateChanged()));
 			Collection<Provider> providers = Context.getProviderService().getProvidersByPerson(sourceData.getChangedBy().getPerson());
 			Provider pvdr = providers.iterator().next();
 			retVal.setAssignedAuthor(this.m_cdaDataUtil.createAuthorPerson(pvdr));
 //			retVal.setAssignedAuthor(new AssignedAuthor(SET.createSET(new II(this.m_cdaConfiguration.getUserRoot(), sourceData.getChangedBy().getId().toString()))));
-		}
-		else
-		{
+		} else {
 			retVal.setTime(this.m_cdaDataUtil.createTS(sourceData.getDateCreated()));
 			Collection<Provider> providers = Context.getProviderService().getProvidersByPerson(sourceData.getCreator().getPerson());
-			if(providers.size() > 0)
-			{
+			if (providers.size() > 0) {
 				Provider pvdr = providers.iterator().next();
 				retVal.setAssignedAuthor(this.m_cdaDataUtil.createAuthorPerson(pvdr));
 			}
@@ -619,28 +636,29 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		SD retVal = new SD();
 		Class<? extends ClinicalStatement> previousStatementType = null;
 		StructDocElementNode context = null; 
-		for(Entry ent : section.getEntry())
-		{
+		for (Entry ent : section.getEntry()) {
 			// Is this different than the previous?
-			if(!ent.getClinicalStatement().getClass().equals(previousStatementType))
-			{
+			if (!ent.getClinicalStatement().getClass().equals(previousStatementType)) {
 				// Add existing context node before generating another
-				if(context!=null)
+				if (context!=null) {
 					retVal.getContent().add(context);
+				}
 				// Force the generation of new context
 				context = null;
 			}
 			StructDocElementNode genNode = this.m_cdaTextUtil.generateText(ent.getClinicalStatement(), context, this.m_documentContext);
 			
 			// Set the context node
-			if(context == null)
+			if (context == null) {
 				context = genNode;
+			}
 			previousStatementType = ent.getClinicalStatement().getClass();
 			
 			ent.setTypeCode(x_ActRelationshipEntry.DRIV);
 		}
-		if(context != null && !retVal.getContent().contains(context))
+		if (context != null && !retVal.getContent().contains(context)) {
 			retVal.getContent().add(context);
+		}
 		return retVal;
 	}
 
@@ -661,7 +679,9 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		SubstanceAdministration retVal = new SubstanceAdministration();
 
 		Reference original = this.createReferenceToDocument(sourceObs);
-		if(original != null) retVal.getReference().add(original);
+		if (original != null) {
+			retVal.getReference().add(original);
+		}
 		
 		// Set the mood code
 	    ExtendedObs extendedObs = Context.getService(CdaImportService.class).getExtendedObs(sourceObs.getId());
@@ -676,8 +696,8 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    retVal.getAuthor().add(this.createAuthorPointer(sourceObs));
 	    
 	    // This is the time that the medication was taken
-    	IVL<TS> effectiveTimePeriod = new IVL<TS>();
-    	SXCM<TS> effectiveTimeInstant = new SXCM<TS>();
+    	IVL<TS> effectiveTimePeriod = new IVL<>();
+    	SXCM<TS> effectiveTimeInstant = new SXCM<>();
     	ISetComponent<TS> frequencyExpression = null, 
     			effectiveTime = null;
 
@@ -685,10 +705,10 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
     	retVal.setStatusCode(this.getStatusCode(sourceObs));
     	
 	    // Effective time and extended observation properties
-	    if(extendedObs != null)
-	    {
-	    	if(extendedObs.getObsRepeatNumber() != null)
-	    		retVal.setRepeatNumber(new INT(extendedObs.getObsRepeatNumber()));
+	    if (extendedObs != null) {
+	    	if (extendedObs.getObsRepeatNumber() != null) {
+				retVal.setRepeatNumber(new INT(extendedObs.getObsRepeatNumber()));
+			}
 	    	
 	    	// Set times
 	    	effectiveTimePeriod = this.getEffectiveTime(extendedObs);
@@ -707,43 +727,35 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    int cSequence = 0;
 	    
 	    // Process the sub-observations
-	    for(Obs component : componentObs)
-	    {
-	    	switch(component.getConcept().getId())
-	    	{
+	    for (Obs component : componentObs) {
+	    	switch (component.getConcept().getId()) {
 	    		case CdaHandlerConstants.CONCEPT_ID_MEDICATION_TEXT:
-	    			if(component.getValueText().startsWith("Instructions"))
-	    			{
+	    			if (component.getValueText().startsWith("Instructions")) {
 	    				Act instructionsAct = new Act(x_ActClassDocumentEntryAct.Act, x_DocumentActMood.Eventoccurrence, new CD<String>("PINSTRUCT", CdaHandlerConstants.CODE_SYSTEM_IHE_ACT_CODE));
 	    				instructionsAct.setTemplateId(LIST.createLIST(new II(CdaHandlerConstants.ENT_TEMPLATE_CCD_INSTRUCTIONS), new II(CdaHandlerConstants.ENT_TEMPLATE_MEDICATION_INSTRUCTIONS)));
 	    				instructionsAct.setText(new ED(component.getValueText()));
-	    			}
-	    			else if(component.getValueText().startsWith("Pre-Condition"))
-	    			{
+	    			} else if (component.getValueText().startsWith("Pre-Condition")) {
 	    				Precondition condition = new Precondition();
 	    				condition.setCriterion(new Criterion());
 	    				condition.getCriterion().setText(new ED(component.getValueText()));
 	    				retVal.getPrecondition().add(condition);
-	    			}
-	    			else if(retVal.getText() == null)
-	    				retVal.setText(new ED(component.getValueText()));
+	    			} else if (retVal.getText() == null) {
+						retVal.setText(new ED(component.getValueText()));
+					}
 	    		case CdaHandlerConstants.CONCEPT_ID_MEDICATION_START_DATE:
-	    			if(extendedObs == null)
-	    			{
+	    			if (extendedObs == null) {
 	    				effectiveTimePeriod.setLow(this.m_cdaDataUtil.createTS(component.getValueDate()));
 	    				effectiveTimePeriod.getLow().setDateValuePrecision(TS.DAY);
 	    			}
 	    			break;
 	    		case CdaHandlerConstants.CONCEPT_ID_MEDICATION_STOP_DATE:
-	    			if(extendedObs == null)
-	    			{
+	    			if (extendedObs == null) {
 	    				effectiveTimePeriod.setHigh(this.m_cdaDataUtil.createTS(component.getValueDate()));
 	    				effectiveTimePeriod.getHigh().setDateValuePrecision(TS.DAY);
 	    			}
 	    			break;
 	    		case CdaHandlerConstants.CONCEPT_ID_IMMUNIZATION_DATE:
-	    			if(extendedObs == null)
-	    			{
+	    			if (extendedObs == null) {
 	    				effectiveTimeInstant.setValue(this.m_cdaDataUtil.createTS(component.getValueDate()));
 	    				effectiveTimeInstant.getValue().setDateValuePrecision(TS.DAY);
 	    			}
@@ -754,7 +766,7 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    		{
 					Drug valueDrug = component.getValueDrug();
 					Concept concept = component.getValueCoded();
-					if(valueDrug != null)
+					if (valueDrug != null)
 						concept = valueDrug.getConcept();
 	    			retVal.setConsumable(this.createConsumable(concept, valueDrug, sourceObs.getConcept().getId()));
 	    		}
@@ -768,12 +780,14 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    			retVal.getEntryRelationship().add(new EntryRelationship(x_ActRelationshipEntryRelationship.SUBJ, BL.TRUE, seriesObservation));
 	    			break;
 	    		case CdaHandlerConstants.CONCEPT_ID_SIGN_SYMPTOM_PRESENT:
-	    		    if(component.getValueCoded().getId().toString().equals(Context.getAdministrationService().getGlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_FALSE_CONCEPT)))
-	    		    	retVal.setNegationInd(BL.TRUE);
+	    		    if (component.getValueCoded().getId().toString().equals(Context.getAdministrationService().getGlobalProperty(OpenmrsConstants.GLOBAL_PROPERTY_FALSE_CONCEPT))) {
+						retVal.setNegationInd(BL.TRUE);
+					}
 	    			break;
 	    		case CdaHandlerConstants.CONCEPT_ID_MEDICATION_QUANTITY: // Quantity is a numeric value and means we don't have / need units because of the form
-	    			if(retVal.getDoseQuantity() == null)
-	    				retVal.setDoseQuantity(new PQ(BigDecimal.valueOf(component.getValueNumeric()), null));
+	    			if (retVal.getDoseQuantity() == null) {
+						retVal.setDoseQuantity(new PQ(BigDecimal.valueOf(component.getValueNumeric()), null));
+					}
 	    			break;
 	    		case CdaHandlerConstants.CONCEPT_ID_SUPPLY:
 	    		{
@@ -786,12 +800,13 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    			
 	    			// Obs for processing extended properties
 	    			ExtendedObs supplyExtended = Context.getService(CdaImportService.class).getExtendedObs(component.getId());
-	    			if(supplyExtended != null)
-	    			{
-	    				if(supplyExtended.getObsRepeatNumber() != null)
-	    					supply.setRepeatNumber(new INT(supplyExtended.getObsRepeatNumber()));
-	    		    	if(supplyExtended.getObsMood() != null)
-	    		    		supply.setMoodCode(this.m_oddMetadataUtil.getStandardizedCode(supplyExtended.getObsMood(), x_ActMoodDocumentObservation.Definition.getCodeSystem(), CS.class));
+	    			if (supplyExtended != null) {
+	    				if (supplyExtended.getObsRepeatNumber() != null) {
+							supply.setRepeatNumber(new INT(supplyExtended.getObsRepeatNumber()));
+						}
+	    		    	if (supplyExtended.getObsMood() != null) {
+							supply.setMoodCode(this.m_oddMetadataUtil.getStandardizedCode(supplyExtended.getObsMood(), x_ActMoodDocumentObservation.Definition.getCodeSystem(), CS.class));
+						}
 	    			}
 	    			
 	    		    // Identifiers
@@ -802,32 +817,35 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    			
 	    			// Process children
 	    			List<Obs> supplyChildren = this.m_service.getObsGroupMembers(component);
-	    			for(Obs supplyComponent : supplyChildren)
-	    			{
-	    				switch(supplyComponent.getConcept().getId())
-	    				{
+	    			for (Obs supplyComponent : supplyChildren) {
+	    				switch (supplyComponent.getConcept().getId()) {
 	    					case CdaHandlerConstants.CONCEPT_ID_DATE_OF_EVENT:
-	    						if(supply.getPerformer().size() == 0)
-	    							supply.getPerformer().add(new Performer2());
+	    						if (supply.getPerformer().size() == 0) {
+									supply.getPerformer().add(new Performer2());
+								}
 	    						supply.getPerformer().get(0).setTime(this.m_cdaDataUtil.createTS(supplyComponent.getValueDate()));
 	    						supply.getPerformer().get(0).getTime().getValue().setDateValuePrecision(TS.DAY);
 	    						break;
 	    					case CdaHandlerConstants.CONCEPT_ID_PROVIDER_NAME:
-	    						if(supply.getPerformer().size() == 0)
-	    							supply.getPerformer().add(new Performer2());
+	    						if (supply.getPerformer().size() == 0) {
+									supply.getPerformer().add(new Performer2());
+								}
 	    						// Get the provider
 	    						Provider provider = Context.getProviderService().getProviderByIdentifier(supplyComponent.getValueText());
-	    						if(provider != null)
-	    							supply.getPerformer().get(0).setAssignedEntity(this.m_cdaDataUtil.createAssignedEntity(provider));
+	    						if (provider != null) {
+									supply.getPerformer().get(0).setAssignedEntity(this.m_cdaDataUtil.createAssignedEntity(provider));
+								}
 								break;
 	    					case CdaHandlerConstants.CONCEPT_ID_MEDICATION_DISPENSED:
-	    						if(supply.getQuantity() == null)
-	    							supply.setQuantity(new PQ(new BigDecimal(supplyComponent.getValueNumeric()), null));
+	    						if (supply.getQuantity() == null) {
+									supply.setQuantity(new PQ(new BigDecimal(supplyComponent.getValueNumeric()), null));
+								}
 	    						break;
 	    					case CdaHandlerConstants.CONCEPT_ID_MEDICATION_STRENGTH:
 	    						IVL<PQ> quantity = this.parseDoseQuantity(supplyComponent.getValueText());
-	    						if(quantity != null && quantity.getValue() != null)
-	    							supply.setQuantity(quantity.getValue());
+	    						if (quantity != null && quantity.getValue() != null) {
+									supply.setQuantity(quantity.getValue());
+								}
 	    						break;
 	    					case CdaHandlerConstants.CONCEPT_ID_MEDICATION_TREATMENT_NUMBER:
 	    						supplyRelationship.setSequenceNumber(supplyComponent.getValueNumeric().intValue());
@@ -836,8 +854,9 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    					{
 	    						Drug valueDrug = supplyComponent.getValueDrug();
 	    						Concept concept = supplyComponent.getValueCoded();
-	    						if(valueDrug != null)
-	    							concept = valueDrug.getConcept();
+	    						if (valueDrug != null) {
+									concept = valueDrug.getConcept();
+								}
 	    						Consumable cons = this.createConsumable(concept, supplyComponent.getValueDrug(), sourceObs.getConcept().getId());
 	    						supply.setProduct(new Product(cons.getManufacturedProduct()));
 	    					}
@@ -907,10 +926,9 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    					frequencyExpression = new EIVL<TS>(DomainTimingEvent.BeforeMeal, new IVL<PQ>(new PQ(new BigDecimal("6"), "h")));
 	    					break;
     					default:
-    						if(component.getValueCoded().getId() > CdaHandlerConstants.MEDICATION_FREQUENCY_30_MINS && component.getValueCoded().getId() < CdaHandlerConstants.MEDICATION_FREQUENCY_8_HOURS)
-    							frequencyExpression = new PIVL<TS>(null, new PQ(new BigDecimal(component.getValueCoded().getId() - CdaHandlerConstants.MEDICATION_FREQUENCY_30_MINS), "h"));
-    						else
-    						{
+    						if (component.getValueCoded().getId() > CdaHandlerConstants.MEDICATION_FREQUENCY_30_MINS && component.getValueCoded().getId() < CdaHandlerConstants.MEDICATION_FREQUENCY_8_HOURS) {
+								frequencyExpression = new PIVL<TS>(null, new PQ(new BigDecimal(component.getValueCoded().getId() - CdaHandlerConstants.MEDICATION_FREQUENCY_30_MINS), "h"));
+							} else {
     							EIVL<TS> other = new EIVL<TS>();
     							CV<String> domainTimingEvent = this.m_oddMetadataUtil.getStandardizedCode(component.getValueCoded(), DomainTimingEvent.AfterBreakfast.getCodeSystem(), CV.class);
     							other.setEvent(new CS<DomainTimingEvent>(FormatterUtil.fromWireFormat(domainTimingEvent.getCode(), DomainTimingEvent.class)));
@@ -945,43 +963,41 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 					retVal.setCode(this.m_oddMetadataUtil.getStandardizedCode(component.getValueCoded(), null, CD.class));
 					
 					// Treatment is unknown?
-					if(retVal.getCode().semanticEquals(s_drugTreatmentUnknownCode) == BL.TRUE)
+					if (retVal.getCode().semanticEquals(s_drugTreatmentUnknownCode) == BL.TRUE)
 						return null;
 					break;
 	    		default:
 	    			// The codes that need to be determined at runtime
-                    if(component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_ROUTE_OF_ADM))
-                    	retVal.setRouteCode(this.m_oddMetadataUtil.getStandardizedCode(component.getValueCoded(), CdaHandlerConstants.CODE_SYSTEM_ROUTE_OF_ADMINISTRATION, CE.class));
-                    else if(component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_REASON))
-                    {
+                    if (component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_ROUTE_OF_ADM)) {
+						retVal.setRouteCode(this.m_oddMetadataUtil.getStandardizedCode(component.getValueCoded(), CdaHandlerConstants.CODE_SYSTEM_ROUTE_OF_ADMINISTRATION, CE.class));
+					} else if (component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_REASON)) {
                     	EntryRelationship reasonRelation = new EntryRelationship(x_ActRelationshipEntryRelationship.HasReason, BL.TRUE);
                     	Act reasonAct = new Act(x_ActClassDocumentEntryAct.Act, x_DocumentActMood.Eventoccurrence);
                     	reasonAct.setTemplateId(LIST.createLIST(new II(CdaHandlerConstants.ENT_TEMPLATE_INTERNAL_REFERENCE)));
                     	reasonAct.setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(component.getValueText())));
                     	reasonRelation.setClinicalStatement(reasonAct);
                     	retVal.getEntryRelationship().add(reasonRelation);
-                    }
-                    else
-                    	throw new RuntimeException("Don't understand how to represent medication component observation");
+                    } else {
+						throw new RuntimeException("Don't understand how to represent medication component observation");
+					}
 	    	}
 
 	    }
 	    
     	// We have medication history  
-    	if(sourceObs.getConcept().getId().equals(CdaHandlerConstants.CONCEPT_ID_MEDICATION_HISTORY))
-    	{
+    	if (sourceObs.getConcept().getId().equals(CdaHandlerConstants.CONCEPT_ID_MEDICATION_HISTORY)) {
     		retVal.getEffectiveTime().add(effectiveTimePeriod);
-    		if(frequencyExpression != null)
-    		{
+    		if (frequencyExpression != null) {
     			((SXCM<TS>)frequencyExpression).setOperator(SetOperator.Intersect); 
     			retVal.getEffectiveTime().add(frequencyExpression);
     		}
-    	}
-    	else
-    		retVal.getEffectiveTime().add(effectiveTimeInstant);
+    	} else {
+			retVal.getEffectiveTime().add(effectiveTimeInstant);
+		}
 
-    	if(sourceObs.getComment() != null)
-    		retVal.setText(new ED(sourceObs.getComment()));
+    	if (sourceObs.getComment() != null) {
+			retVal.setText(new ED(sourceObs.getComment()));
+		}
 	    return retVal;
     }
 
@@ -991,22 +1007,22 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	protected Reference createReferenceToDocument(Obs sourceObs) {
 		
 		Reference retVal = null;
-		if(sourceObs.getEncounter().getVisit() != null)
-		{
+		if (sourceObs.getEncounter().getVisit() != null) {
             try {
             	retVal = new Reference();
         		ExternalDocument ed = new ExternalDocument();
         		
             	VisitAttributeType vat = this.m_conceptUtil.getOrCreateVisitExternalIdAttributeType();
-    			for(VisitAttribute attr : sourceObs.getEncounter().getVisit().getActiveAttributes())
-    				if(attr.getAttributeType().equals(vat))
-    					ed.setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(attr.getValue().toString())));
+    			for (VisitAttribute attr : sourceObs.getEncounter().getVisit().getActiveAttributes()) {
+					if (attr.getAttributeType().equals(vat)) {
+						ed.setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(attr.getValue().toString())));
+					}
+				}
 
     			retVal.setTypeCode(x_ActRelationshipExternalReference.REFR);
     			retVal.setExternalActChoice(ed);
 
-            }
-            catch (DocumentImportException e) {
+            } catch (DocumentImportException e) {
 	            // TODO Auto-generated catch block
 	            log.error("Error generated", e);
             }
@@ -1023,26 +1039,24 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 			Matcher match = regexPattern.matcher(valueText);
 			IVL<PQ> retVal = null;
 			
-			if(match.matches())
-			{
+			if (match.matches()) {
 				// Group 1 and 2 are the value and dose and 3 and 4 are another
 				PQ group1 = null;
-				if(match.group(1) != null && !match.group(1).isEmpty())
+				if (match.group(1) != null && !match.group(1).isEmpty()) {
 					group1 = new PQ(new BigDecimal(match.group(1)), match.group(2));
-				if(match.groupCount() > 3 && match.group(3) != null && !match.group(3).isEmpty())
-				{
+				}
+				if (match.groupCount() > 3 && match.group(3) != null && !match.group(3).isEmpty()) {
 					PQ group2 = new PQ(new BigDecimal(match.group(3)), match.group(4));
 					// Range
 					retVal = new IVL<PQ>(group1, group2);
-				}
-				else if(valueText.contains("{"))
+				} else if (valueText.contains("{")) {
 					retVal = new IVL<PQ>(group1, null);
-				else
+				} else {
 					retVal = new IVL<PQ>(group1);
-				
-			}
-			else
+				}
+			} else {
 				throw new RuntimeException(String.format("Can't understand value %s", valueText));
+			}
 	
 			return retVal;
 	}
@@ -1062,18 +1076,20 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		
 		// Drug code
 		CE<String> cvxCode = this.m_oddMetadataUtil.getStandardizedCode(valueConcept, CdaHandlerConstants.CODE_SYSTEM_CVX, CE.class);
-		if(cvxCode != null && cvxCode.isNull())
-		{
+		if (cvxCode != null && cvxCode.isNull()) {
 			CE<String> drugCode = this.m_oddMetadataUtil.getStandardizedCode(valueConcept, CdaHandlerConstants.CODE_SYSTEM_RXNORM, CE.class);
-			if(!drugCode.isNull())
+			if (!drugCode.isNull()) {
 				manufacturedMaterial.setCode(drugCode);
+			}
 		}
-		if(manufacturedMaterial.getCode() == null)
+		if (manufacturedMaterial.getCode() == null) {
 			manufacturedMaterial.setCode(cvxCode);
+		}
 		
 		// Now get the drug from the concept
-		if(valueDrug != null && valueDrug.getName() != null)
+		if (valueDrug != null && valueDrug.getName() != null) {
 			manufacturedMaterial.setName(new EN(Arrays.asList(new ENXP(valueDrug.getName()))));
+		}
 
 		consumable.setManufacturedProduct(product);
 		return consumable;
@@ -1127,7 +1143,9 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    retVal.getAuthor().add(this.createAuthorPointer(sourceObs));
 
 		Reference original = this.createReferenceToDocument(sourceObs);
-		if(original != null) retVal.getReference().add(original);
+		if (original != null) {
+			retVal.getReference().add(original);
+		}
 
 		// Extended observations
 		ExtendedObs extendedObs = Context.getService(CdaImportService.class).getExtendedObs(sourceObs.getId());
@@ -1139,16 +1157,13 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		retVal.setEffectiveTime(this.getEffectiveTime(sourceObs));
 		
 		// Component obs
-		for(Obs component : this.m_service.getObsGroupMembers(sourceObs))
-		{
-			switch(component.getConcept().getId())
-			{
+		for (Obs component : this.m_service.getObsGroupMembers(sourceObs)) {
+			switch (component.getConcept().getId()) {
 				case CdaHandlerConstants.CONCEPT_ID_PROCEDURE:
 					retVal.setCode(this.m_oddMetadataUtil.getStandardizedCode(component.getConcept(), null, CD.class));
 					break;
 				case CdaHandlerConstants.CONCEPT_ID_PROCEDURE_DATE:
-					if(extendedObs == null)
-					{
+					if (extendedObs == null) {
 						retVal.setEffectiveTime(this.m_cdaDataUtil.createTS(component.getValueDate()));
 						retVal.getEffectiveTime().getValue().setDateValuePrecision(TS.DAY);
 					}
@@ -1156,8 +1171,9 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 				case CdaHandlerConstants.CONCEPT_ID_PROVIDER_NAME:
 					// Get the provider
 					Provider provider = Context.getProviderService().getProviderByIdentifier(component.getValueText());
-					if(provider != null)
+					if (provider != null) {
 						retVal.getPerformer().add(new Performer2(this.m_cdaDataUtil.createAssignedEntity(provider)));
+					}
 					break;
 				case CdaHandlerConstants.CONCEPT_ID_PROCEDURE_HISTORY: // A sub-observation
 	    		{
@@ -1169,42 +1185,38 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	    			break;
 	    		}
 				default:
-					if(component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_APPROACH_SITE))
-					{
-						if(retVal.getApproachSiteCode() == null)
+					if (component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_APPROACH_SITE)) {
+						if (retVal.getApproachSiteCode() == null) {
 							retVal.setApproachSiteCode(new SET<CD<String>>());
+						}
 						retVal.getApproachSiteCode().add(this.m_oddMetadataUtil.getStandardizedCode(component.getValueCoded(), null, CD.class))
 							;
-					}
-					else if(component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_TARGET_SITE))
-					{
-						if(retVal.getTargetSiteCode() == null)
+					} else if (component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_TARGET_SITE)) {
+						if (retVal.getTargetSiteCode() == null) {
 							retVal.setTargetSiteCode(new SET<CD<String>>());
+						}
 						retVal.getTargetSiteCode().add(this.m_oddMetadataUtil.getStandardizedCode(component.getConcept(), null, CD.class));
-					}
-					else if(component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_REASON))
-					{
+					} else if (component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_REASON)) {
 						EntryRelationship er = new EntryRelationship(x_ActRelationshipEntryRelationship.HasReason, BL.TRUE);
 						er.setClinicalStatement(this.createInternalReference(component.getValueText()));
 						retVal.getEntryRelationship().add(er);
-					}
-					else if(component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_REFERENCE))
-					{
+					} else if (component.getConcept().getUuid().equals(CdaHandlerConstants.RMIM_CONCEPT_UUID_REFERENCE)) {
 						EntryRelationship er = new EntryRelationship(x_ActRelationshipEntryRelationship.HasComponent, BL.TRUE);
 						er.setInversionInd(BL.TRUE);
 						er.setClinicalStatement(this.createInternalReference(component.getValueText()));
 						retVal.getEntryRelationship().add(er);
+					} else {
+						throw new RuntimeException("Don't understand how to represent procedure component observation");
 					}
-					else
-                    	throw new RuntimeException("Don't understand how to represent procedure component observation");
 
 					break;
 			}
 		}
 		
 
-    	if(sourceObs.getComment() != null)
-    		retVal.setText(new ED(sourceObs.getComment()));
+    	if (sourceObs.getComment() != null) {
+			retVal.setText(new ED(sourceObs.getComment()));
+		}
 	    return retVal;
 		
     }
@@ -1244,11 +1256,11 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	protected LIST<II> getTemplateIdList(List<String> templateIds)
 	{
 		LIST<II> retVal = null;
-		if(templateIds.size() > 0)
-		{
+		if (templateIds.size() > 0) {
 			retVal = new LIST<II>();
-			for(String tplId : templateIds)
+			for (String tplId : templateIds) {
 				retVal.add(new II(tplId));
+			}
 		}
 		return retVal;
 
@@ -1273,8 +1285,7 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		Observation probObs = new Observation(x_ActMoodDocumentObservation.Eventoccurrence);
 		probObs.setStatusCode(ActStatus.Completed);
 		probObs.setTemplateId(this.getTemplateIdList(Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_OBSERVATION)));
-		if(templateIds.contains(CdaHandlerConstants.ENT_TEMPLATE_ALLERGIES_AND_INTOLERANCES_CONCERN))
-		{
+		if (templateIds.contains(CdaHandlerConstants.ENT_TEMPLATE_ALLERGIES_AND_INTOLERANCES_CONCERN)) {
 			probObs.getTemplateId().add(new II(CdaHandlerConstants.ENT_TEMPLATE_CCD_ALERT_OBSERVATION));
 			probObs.getTemplateId().add(new II(CdaHandlerConstants.ENT_TEMPLATE_ALLERGY_AND_INTOLERANCE_OBSERVATION));
 		}
@@ -1302,19 +1313,20 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 		retVal.setCode(new CD<String>());
 		retVal.getCode().setNullFlavor(NullFlavor.NotApplicable);
 		
-		for(Obs subObs : this.m_service.getObsGroupMembers(data))
-		{
+		for (Obs subObs : this.m_service.getObsGroupMembers(data)) {
 			Reference ref = new Reference();
 			ref.setTypeCode(this.m_oddMetadataUtil.getStandardizedCode(subObs.getConcept(), x_ActRelationshipExternalReference.ELNK.getCodeSystem(), CS.class));
 			ref.setExternalActChoice(new ExternalDocument());
 			ref.getExternalActChoiceIfExternalDocument().setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(subObs.getValueText())));
-			if(subObs.getComment() != null)
+			if (subObs.getComment() != null) {
 				ref.getExternalActChoiceIfExternalDocument().setText(new ED(subObs.getComment()));
+			}
 			retVal.getReference().add(ref);
 		}
 		
-		if(data.getComment() != null)
+		if (data.getComment() != null) {
 			retVal.setText(new ED(data.getComment()));
+		}
 		
 		return retVal;
 	}
@@ -1324,22 +1336,23 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	 */
 	protected void correctCode(CE<?> code, String... codeSystems) {
 
-		if(code.isNull())
+		if (code.isNull()) {
 			return;
+		}
 
 		// Already preferred
-		for(String cs : codeSystems)
-			if(code.getCodeSystem().equals(cs))
-				return; 
+		for (String cs : codeSystems) {
+			if (code.getCodeSystem().equals(cs)) {
+				return;
+			}
+		}
 		
 		// Get translation
 		code.getTranslation().add(new CD(code.getCode(), code.getCodeSystem(), code.getCodeSystemName(), code.getCodeSystemVersion(), code.getDisplayName(), null));
 		// Move the first translation to the root code
-		for(String cs : codeSystems)
-		{
-			for(CD<?> tx : code.getTranslation())
-				if(tx.getCodeSystem().equals(cs))
-				{
+		for (String cs : codeSystems) {
+			for (CD<?> tx : code.getTranslation()) {
+				if (tx.getCodeSystem().equals(cs)) {
 					code.setCode(tx.getCode());
 					code.setCodeSystem(tx.getCodeSystem());
 					code.setDisplayName(tx.getDisplayName());
@@ -1348,6 +1361,7 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 					code.getTranslation().remove(tx);
 					return;
 				}
+			}
 		}
 		
 		// Not found :| ... Null Flavor it with OTH
@@ -1366,22 +1380,22 @@ public abstract class SectionGeneratorImpl implements SectionGenerator {
 	protected Reference createReferenceToDocument(Encounter enc) {
 		
 		Reference retVal = null;
-		if(enc.getVisit() != null)
-		{
+		if (enc.getVisit() != null) {
             try {
             	retVal = new Reference();
         		ExternalDocument ed = new ExternalDocument();
         		
             	VisitAttributeType vat = this.m_conceptUtil.getOrCreateVisitExternalIdAttributeType();
-    			for(VisitAttribute attr : enc.getVisit().getActiveAttributes())
-    				if(attr.getAttributeType().equals(vat))
-    					ed.setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(attr.getValue().toString())));
+    			for (VisitAttribute attr : enc.getVisit().getActiveAttributes()) {
+					if (attr.getAttributeType().equals(vat)) {
+						ed.setId(SET.createSET(this.m_cdaDataUtil.parseIIFromString(attr.getValue().toString())));
+					}
+				}
 
     			retVal.setTypeCode(x_ActRelationshipExternalReference.REFR);
     			retVal.setExternalActChoice(ed);
 
-            }
-            catch (DocumentImportException e) {
+            } catch (DocumentImportException e) {
 	            log.error("Error generated", e);
             }
 		}
