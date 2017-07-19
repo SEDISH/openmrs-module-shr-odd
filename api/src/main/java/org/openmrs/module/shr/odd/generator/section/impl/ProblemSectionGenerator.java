@@ -1,11 +1,11 @@
 package org.openmrs.module.shr.odd.generator.section.impl;
 
-import java.util.Arrays;
-import java.util.List;
-
 import org.marc.everest.datatypes.BL;
+import org.marc.everest.datatypes.NullFlavor;
+import org.marc.everest.datatypes.TS;
 import org.marc.everest.datatypes.generic.CD;
 import org.marc.everest.datatypes.generic.CE;
+import org.marc.everest.datatypes.generic.IVL;
 import org.marc.everest.rmim.uv.cdar2.pocd_mt000040uv.Act;
 import org.marc.everest.rmim.uv.cdar2.pocd_mt000040uv.Entry;
 import org.marc.everest.rmim.uv.cdar2.pocd_mt000040uv.EntryRelationship;
@@ -17,12 +17,17 @@ import org.marc.everest.rmim.uv.cdar2.vocabulary.x_ActRelationshipEntry;
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_ActRelationshipEntryRelationship;
 import org.marc.everest.rmim.uv.cdar2.vocabulary.x_DocumentActMood;
 import org.openmrs.Concept;
+import org.openmrs.Condition;
 import org.openmrs.Obs;
-import org.openmrs.activelist.ActiveListItem;
-import org.openmrs.activelist.Problem;
 import org.openmrs.api.context.Context;
+import org.openmrs.module.emrapi.conditionslist.ConditionService;
 import org.openmrs.module.shr.cdahandler.CdaHandlerConstants;
+import org.openmrs.module.shr.cdahandler.api.CdaImportService;
 import org.openmrs.module.shr.cdahandler.exception.DocumentImportException;
+import org.openmrs.module.shr.cdahandler.obs.ExtendedObs;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Generator for Problem section
@@ -49,48 +54,76 @@ public class ProblemSectionGenerator extends SectionGeneratorImpl {
 	public Section generateSection() {
 
 		// Are there problems on file for the patient?
-		List<ActiveListItem> problems = Context.getActiveListService().getActiveListItems(this.m_registration.getPatient(), Problem.ACTIVE_LIST_TYPE);
+		List<Condition> conditions = Context.getService(ConditionService.class).getActiveConditions(this.m_registration.getPatient());
 
 		// Create generic section construct
 		Section retVal = super.createSection(
-			Arrays.asList(CdaHandlerConstants.SCT_TEMPLATE_CCD_PROBLEM, CdaHandlerConstants.SCT_TEMPLATE_ACTIVE_PROBLEMS), 
+			Arrays.asList(CdaHandlerConstants.SCT_TEMPLATE_CCD_PROBLEM, CdaHandlerConstants.SCT_TEMPLATE_ACTIVE_PROBLEMS),
 			"section.problem.title",
 			this.m_sectionCode
 		);
 
 		// Problem section must have level 3 content
-		if(problems.size() > 0)
-		{
+		if (conditions.size() > 0) {
 			// Generate problem list
-			for(ActiveListItem itm : problems)
-			{
+			for (Condition condition : conditions) {
 				Act problemAct = super.createAct(
 					x_ActClassDocumentEntryAct.Act,
 					x_DocumentActMood.Eventoccurrence,
 					Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_CONCERN, CdaHandlerConstants.ENT_TEMPLATE_CONCERN_ENTRY, CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_ACT),
-					itm);
-				
-				Problem prob = (Problem)itm;
-				
+					condition);
+
+				// Now add reference the status code
+				IVL<TS> eft = new IVL<>();
+
+				Obs startObs = findFirstProblemObs(condition.getPatient(), condition.getConcept());
+				Obs stopObs = findLastProblemObs(condition.getPatient(), condition.getConcept());
+
+				if (startObs != null) {
+					eft.setLow(this.m_cdaDataUtil.createTS(condition.getOnsetDate()));
+					//Correct the precision of the dates
+					ExtendedObs obs = Context.getService(CdaImportService.class).getExtendedObs(startObs.getId());
+					if ((obs != null) && obs.getObsDatePrecision() == 0) {
+						eft.getLow().setNullFlavor(NullFlavor.Unknown);
+					} else if (obs != null) {
+						eft.getLow().setDateValuePrecision(obs.getObsDatePrecision());
+					}
+				}
+				if (stopObs != null) {
+					eft.setHigh(this.m_cdaDataUtil.createTS(condition.getEndDate()));
+					// Correct the precision of the dates
+					ExtendedObs obs = Context.getService(CdaImportService.class).getExtendedObs(stopObs.getId());
+					if ((obs != null) && (obs.getObsDatePrecision() == 0)) {
+						eft.getHigh().setNullFlavor(NullFlavor.Unknown);
+					} else if (obs != null) {
+						eft.getHigh().setDateValuePrecision(obs.getObsDatePrecision());
+					}
+				}
+				problemAct.setEffectiveTime(eft);
+
+
+
 				// Negation indicator?
-				if(prob.getModifier() != null)
-					switch(prob.getModifier())
-					{
+				if (condition.getStatus() != null) {
+					switch (condition.getStatus()) {
 						case HISTORY_OF:
 							problemAct.setStatusCode(ActStatus.Completed);
-						case RULE_OUT:
+							break;
+						case INACTIVE:
 							problemAct.setNegationInd(BL.TRUE);
+							break;
+						case ACTIVE:
+							problemAct.setStatusCode(ActStatus.Active);
+							break;
 					}
-				else
+				} else {
 					problemAct.setStatusCode(ActStatus.Active);
-				
+				}
+
 				// Add an entry relationship of the problem
-				Obs problemObs = itm.getStartObs();
-				if(itm.getStopObs() != null)
-					problemObs = itm.getStopObs();
 				
-				Observation problemObservation = super.createObs(Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_OBSERVATION), 
-					problemObs, 
+				Observation problemObservation = super.createObs(Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_OBSERVATION, CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_OBSERVATION),
+						stopObs,
 					CdaHandlerConstants.CODE_SYSTEM_SNOMED);
 				
 				problemAct.getEntryRelationship().add(new EntryRelationship(x_ActRelationshipEntryRelationship.SUBJ, BL.FALSE, BL.TRUE, null, null, null, problemObservation));
@@ -100,14 +133,9 @@ public class ProblemSectionGenerator extends SectionGeneratorImpl {
 
 			retVal.setText(super.generateLevel3Text(retVal));
 			
-		}
-		else if(this.getSectionObs().size() > 0) // unstructured?
-		{
+		} else if (this.getSectionObs().size() > 0) { // unstructured?
 			super.generateLevel2Content(retVal);
-		}
-		else
-		{
-			
+		} else {
 			Act problemAct = super.createNoKnownProblemAct(
 				Arrays.asList(CdaHandlerConstants.ENT_TEMPLATE_PROBLEM_CONCERN, CdaHandlerConstants.ENT_TEMPLATE_CONCERN_ENTRY, CdaHandlerConstants.ENT_TEMPLATE_CCD_PROBLEM_ACT),
 				new CD<String>("55607006", CdaHandlerConstants.CODE_SYSTEM_SNOMED, null, null, "Problem", null),

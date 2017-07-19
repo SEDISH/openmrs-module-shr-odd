@@ -1,9 +1,5 @@
 package org.openmrs.module.shr.odd.subscriber;
 
-import java.util.Calendar;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.marc.everest.rmim.uv.cdar2.pocd_mt000040uv.ClinicalDocument;
@@ -19,6 +15,11 @@ import org.openmrs.module.shr.odd.model.OnDemandDocumentEncounterLink;
 import org.openmrs.module.shr.odd.model.OnDemandDocumentRegistration;
 import org.openmrs.module.shr.odd.model.OnDemandDocumentType;
 import org.openmrs.module.shr.odd.util.XdsUtil;
+
+import java.util.Calendar;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Represents a subscriber for Antepartum messages related to an 
@@ -52,12 +53,13 @@ public class AntepartumSubscriber implements CdaImportSubscriber {
 	 */
 	public static final AntepartumSubscriber getInstance() {
 
-		if(s_instance == null)
-			synchronized(s_lockObject)
-			{
-				if(s_instance == null)
+		if (s_instance == null) {
+			synchronized (s_lockObject) {
+				if (s_instance == null) {
 					s_instance = new AntepartumSubscriber();
+				}
 			}
+		}
 		return s_instance;
 	}
 	
@@ -69,19 +71,20 @@ public class AntepartumSubscriber implements CdaImportSubscriber {
 	@Override
     public void onDocumentImported(ClinicalDocument rawDocument, Visit processedVisit) {
 	
-		try
-		{
+		try {
 			// Does this document have an estimated delivery date observation?
 			OnDemandDocumentRegistration oddRegistration = this.getApplicableOddRegistration(processedVisit);
 			
 			// Encounters 
-			for(Encounter enc : processedVisit.getEncounters())
-			{
+			for (Encounter enc : processedVisit.getEncounters()) {
 				boolean duplicate = false;
-				for(OnDemandDocumentEncounterLink elnk : oddRegistration.getEncounterLinks())
+				for (OnDemandDocumentEncounterLink elnk : oddRegistration.getEncounterLinks()) {
 					duplicate |= elnk.getEncounter().getId().equals(enc.getId());
-				if(duplicate) continue; // don't process
-				
+				}
+				if (duplicate) { // don't process
+					continue;
+				}
+
 				OnDemandDocumentEncounterLink elnk = new OnDemandDocumentEncounterLink();
 				elnk.setEncounter(enc);
 				elnk.setRegistration(oddRegistration);
@@ -94,10 +97,10 @@ public class AntepartumSubscriber implements CdaImportSubscriber {
 			this.m_service.saveOnDemandDocument(oddRegistration);
 	
 			// Register the pnr
-			if(needsNotification) // Register new only TODO: Update this to support update
+			if (needsNotification) {// Register new only TODO: Update this to support update
 				XdsUtil.getInstance().registerDocumentSet(oddRegistration);
-		}
-		catch (Exception e) {
+			}
+		} catch (Exception e) {
 	        // TODO Auto-generated catch block
 	        log.error("Could not register document with registry", e);
         }
@@ -111,39 +114,40 @@ public class AntepartumSubscriber implements CdaImportSubscriber {
 
 		List<OnDemandDocumentRegistration> currentApsRegistrations = this.m_service.getOnDemandDocumentRegistrationsByPatient(processedVisit.getPatient(), this.m_oddType);
 		String accessionNumber = String.format("%s.%s.%s.%s", this.m_configuration.getOnDemandDocumentRoot(), this.m_oddType.getId(), processedVisit.getPatient().getId(), currentApsRegistrations.size());
-		if(currentApsRegistrations.size() == 0)
-		{
+		if (currentApsRegistrations.size() == 0) {
 			OnDemandDocumentRegistration retVal = new OnDemandDocumentRegistration();
 			retVal.setPatient(processedVisit.getPatient());
 			retVal.setType(this.m_oddType);
 			retVal.setAccessionNumber(accessionNumber);
 			retVal.setTitle(String.format("Antepartum Summary episode #%s", currentApsRegistrations.size() + 1));
 			return retVal;
-		}
-		else // Find the appropriate one, whereby the visit time is before the most recent estimated delivery date
-		{
-			// get the estimated delivery date observation? 
-			Set<Obs> confinementObservations = Context.getObsService().getObservations(processedVisit.getPatient(), Context.getConceptService().getConcept(CONCEPT_ID_DATE_OF_CONFINEMENT_EST), false);
+		} else { // Find the appropriate one, whereby the visit time is before the most recent estimated delivery date
+			// get the estimated delivery date observation?
+			List<Obs> confinementObservations = Context.getObsService().getObservationsByPersonAndConcept(processedVisit.getPatient(),Context.getConceptService().getConcept(CONCEPT_ID_DATE_OF_CONFINEMENT_EST));
+			Set<Obs> setConfinementObservations=new HashSet<>();
+			setConfinementObservations.addAll(confinementObservations);
 			Obs lastConfinementObs = null;
 			// Find that last confinement obs with a time before the end of this visit
-			for(Obs candidateObs : confinementObservations)
-			{
+			for (Obs candidateObs : setConfinementObservations) {
 				Calendar lastPossibleConfinementDate = Calendar.getInstance();
 				lastPossibleConfinementDate.setTime(candidateObs.getValueDate());
 				lastPossibleConfinementDate.add(Calendar.MONTH, 1);
 				
 				if(processedVisit.getStopDatetime().before(lastPossibleConfinementDate.getTime()) &&
-						(lastConfinementObs == null || lastConfinementObs.getValueDatetime().after(candidateObs.getValueDatetime())))
+						(lastConfinementObs == null || lastConfinementObs.getValueDatetime().after(candidateObs.getValueDatetime()))) {
 					lastConfinementObs = candidateObs;
+				}
 			}
 			
 			// Is the last confinement obs (EDD) within a month of the data assigned here?
-			if(lastConfinementObs != null)
-			{
-				for(OnDemandDocumentRegistration oddRegistration : currentApsRegistrations)
-					for(OnDemandDocumentEncounterLink el : oddRegistration.getEncounterLinks())
-						if(lastConfinementObs.getEncounter().getId().equals(el.getEncounter().getId()))
-						return oddRegistration;
+			if (lastConfinementObs != null) {
+				for (OnDemandDocumentRegistration oddRegistration : currentApsRegistrations) {
+					for (OnDemandDocumentEncounterLink el : oddRegistration.getEncounterLinks()) {
+						if (lastConfinementObs.getEncounter().getId().equals(el.getEncounter().getId())) {
+							return oddRegistration;
+						}
+					}
+				}
 
 				// The encounter isn't part of a registration so create one
 			}

@@ -9,8 +9,6 @@ import java.io.FileNotFoundException;
 import java.net.URL;
 import java.util.List;
 
-import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Before;
@@ -88,26 +86,20 @@ public class OnDemandDocumentServiceImplTest extends BaseModuleContextSensitiveT
 		URL validAphpSample = this.getClass().getResource(resourceName);
 		File fileUnderTest = new File(validAphpSample.getFile());
 		FileInputStream fs = null;
-		try
-		{
+		try {
 			fs = new FileInputStream(fileUnderTest);
 			Visit parsedVisit = this.m_importService.importDocument(fs);
 			assertEquals(parsedVisit, Context.getVisitService().getVisitByUuid(parsedVisit.getUuid()));
 			return parsedVisit;
-		}
-		catch(DocumentValidationException e)
-		{
+		} catch(DocumentValidationException e) {
 			log.error(String.format("Error in %s", FormatterUtil.toWireFormat(((InfrastructureRoot)e.getTarget()).getTemplateId())));
-			for(IResultDetail dtl : e.getValidationIssues())
+			for (IResultDetail dtl : e.getValidationIssues())
 				log.error(String.format("%s %s", dtl.getType(), dtl.getMessage()));
 			return null;
-		}
-		catch(DocumentImportException e)
-		{
+		} catch(DocumentImportException e) {
 			log.error("Error generated", e);
 			return null;
-		}
-        catch (FileNotFoundException e) {
+		} catch (FileNotFoundException e) {
 	        // TODO Auto-generated catch block
 	        log.error("Error generated", e);
 	        return null;
@@ -125,9 +117,9 @@ public class OnDemandDocumentServiceImplTest extends BaseModuleContextSensitiveT
 		Visit visit = this.doParseCda("/validAphpSampleFullSections.xml");
 		// Get patient information by name
 		List<Patient> patient = Context.getPatientService().getPatients("Sarah Levin");
-		Assert.assertEquals(1, patient.size());
+		assertEquals(1, patient.size());
 		List<OnDemandDocumentRegistration> oddDocuments = this.m_oddService.getOnDemandDocumentRegistrationsByPatient(patient.get(0));
-		Assert.assertEquals(2, oddDocuments.size());
+		assertEquals(2, oddDocuments.size());
 	}
 	
 	/**
@@ -141,9 +133,9 @@ public class OnDemandDocumentServiceImplTest extends BaseModuleContextSensitiveT
 		Visit visit = this.doParseCda("/validAphpSampleFullSections.xml");
 		// Get patient information by name
 		List<Patient> patient = Context.getPatientService().getPatients("Sarah Levin");
-		Assert.assertEquals(1, patient.size());
+		assertEquals(1, patient.size());
 		List<OnDemandDocumentRegistration> oddDocuments = this.m_oddService.getOnDemandDocumentRegistrationsByPatient(patient.get(0));
-		Assert.assertEquals(2, oddDocuments.size());
+		assertEquals(2, oddDocuments.size());
 		// Generate CCD
 		try {
 	        ClinicalDocument doc = this.m_oddService.generateOnDemandDocument(oddDocuments.get(0));
@@ -151,8 +143,7 @@ public class OnDemandDocumentServiceImplTest extends BaseModuleContextSensitiveT
 	        doc = this.m_oddService.generateOnDemandDocument(oddDocuments.get(1));
 	        log.error(CdaLoggingUtils.getCdaAsString(doc));
 
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
 	        log.error("Error generated", e);
 	        fail(e.getMessage());
         }
@@ -170,18 +161,17 @@ public class OnDemandDocumentServiceImplTest extends BaseModuleContextSensitiveT
 				visit2 = this.doParseCda("/validAphpSamplePovich2.xml");
 		// Get patient information by name
 		List<Patient> patient = Context.getPatientService().getPatients("Mary Levin");
-		Assert.assertEquals(1, patient.size());
+		assertEquals(1, patient.size());
 		List<OnDemandDocumentRegistration> oddDocuments = this.m_oddService.getOnDemandDocumentRegistrationsByPatient(patient.get(0));
 		// One APS one CCD
-		Assert.assertEquals(3, oddDocuments.size());
-		Assert.assertEquals(2, oddDocuments.get(1).getEncounterLinks().size());
+		assertEquals(3, oddDocuments.size());
+		assertEquals(2, oddDocuments.get(1).getEncounterLinks().size());
 		
 		// Generate CCD
 		try {
 	        ClinicalDocument doc = this.m_oddService.generateOnDemandDocument(oddDocuments.get(0));
 	        log.error(CdaLoggingUtils.getCdaAsString(doc));
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
 	        log.error("Error generated", e);
 	        fail(e.getMessage());
         }
@@ -199,17 +189,16 @@ public class OnDemandDocumentServiceImplTest extends BaseModuleContextSensitiveT
 		Visit visit1 = this.doParseCda("/validCdaLevel3Sample.xml");
 		// Get patient information by name
 		List<Patient> patient = Context.getPatientService().getPatients("Patty");
-		Assert.assertEquals(1, patient.size());
+		assertEquals(1, patient.size());
 		List<OnDemandDocumentRegistration> oddDocuments = this.m_oddService.getOnDemandDocumentRegistrationsByPatient(patient.get(0));
-		Assert.assertEquals(1, oddDocuments.size());
-		Assert.assertEquals(1, oddDocuments.get(0).getEncounterLinks().size());
+		assertEquals(1, oddDocuments.size());
+		assertEquals(1, oddDocuments.get(0).getEncounterLinks().size());
 		
 		// Generate CCD
 		try {
 	        ClinicalDocument doc = this.m_oddService.generateOnDemandDocument(oddDocuments.get(0));
 	        log.error(CdaLoggingUtils.getCdaAsString(doc));
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
 	        log.error("Error generated", e);
 	        fail(e.getMessage());
         }
